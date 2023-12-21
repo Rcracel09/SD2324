@@ -1,4 +1,4 @@
-package SD2324; 
+package SD2324;  
 
 public class User {
     String username;

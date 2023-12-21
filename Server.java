@@ -1,56 +1,75 @@
-package SD2324; 
+package SD2324;  
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.concurrent.locks.ReentrantLock;
+
+import SD2324.TaggedConnection.Frame;
+
+
 
 class ServerWorker implements Runnable{
     private Socket s;
-    private DataOutputStream out;
-    private DataInputStream in;
+    private TaggedConnection conn;
 
     private ServerData serverData;
-
-    private ReentrantLock l = new ReentrantLock();
 
 
     public ServerWorker(Socket socket, ServerData servercurrentData) throws IOException {
         s = socket;
-        in = new DataInputStream(s.getInputStream());
-        out = new DataOutputStream(s.getOutputStream());
+        conn = new TaggedConnection(s);
         serverData = servercurrentData;
     }
 
     @Override
     public void run() {
         try{
-            String command = in.readUTF();
+            Frame command_Frame = conn.receive();
+            String command = new String(command_Frame.getData());
 
             while(command!=null) {
                 switch(command) {
                     case "register": {
-                        String username = in.readUTF();
-                        String password = in.readUTF();
-                        Boolean resultado = serverData.registerUserServer(username, password);
-                        l.lock();
-                        out.writeBoolean(resultado);
+                        System.out.println("Já comecei processo de registar" + command);
+                        Frame frame_username = conn.receive();
+                        System.out.println("Já recebi o username");
+                        String username = new String(frame_username.getData());
+                        System.out.println("Transformei o username em String" + username);
+
+                        Frame frame_password = conn.receive();
+                        System.out.println("Já recebi a password");
+                        String password = new String(frame_password.getData());
+                        System.out.println("Transformei a password em String" + password);
+
+                        String resultado = String.valueOf(serverData.registerUserServer(username, password));
+                        System.out.println("Vou tentar enviar o resultado da register" + resultado);
+                        conn.send(1, resultado.getBytes());
+                        System.out.println("Já enviei o resultado da register");
                         break;
                     }
                     case "logIn": {
-                        String username = in.readUTF();
-                        String password = in.readUTF();
-                        Boolean resultado = serverData.logInUserServer(username, password);
-                        l.lock();
-                        out.writeBoolean(resultado);
+                        System.out.println("Já comecei processo de logIn");
+                        Frame frame_username = conn.receive();
+                        System.out.println("Já recebi o username");
+                        String username = new String(frame_username.getData());
+                        System.out.println("Transformei o username em String");
+
+                        Frame frame_password = conn.receive();
+                        System.out.println("Já recebi a password");
+                        String password = new String(frame_password.getData());
+                        System.out.println("Transformei a password em String");
+
+                        String resultado = String.valueOf(serverData.logInUserServer(username, password));
+                        conn.send(1, resultado.getBytes());
                         break;
                     }
-                }
-                out.flush();
-                l.unlock();
-                command = in.readUTF();
+                    default:{
+                        System.out.println("Recebi a informação errada da send");
+                        break;
+                    }
+                } 
+                command_Frame = conn.receive();
+                command = new String(command_Frame.getData());
             }
         }
         catch(Exception e) {
@@ -59,7 +78,7 @@ class ServerWorker implements Runnable{
     }
 
 }
- public class Server { 
+ public class Server {
     public static void main(String[] args) throws IOException {
         ServerSocket ss = new ServerSocket(11200);
         ServerData serverData = new ServerData();

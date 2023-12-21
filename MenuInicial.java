@@ -1,13 +1,12 @@
-package SD2324; 
+package SD2324;  
 
 import java.io.IOException;
 import java.util.Scanner;
 
 public class MenuInicial {
 
-    private static Client cliente;
 
-    private static void menuregister() throws IOException {
+    private static void menuregister(Client client) throws IOException, InterruptedException {
         Scanner scanner = new Scanner(System.in);
 
         System.out.println("Username you want to be used:");
@@ -18,43 +17,43 @@ public class MenuInicial {
         String passwordCheck = scanner.nextLine();
         if (!password.equals(passwordCheck)) {
             System.out.println("Error password doesn't match:");
-            menuregister();
+            menuregister(client);
         }
         else {
-                Boolean resultado = cliente.register(username, password);
+                Boolean resultado = client.register(username, password);
                 if(resultado) {
                     //System.out.println(resultado);
                     System.out.println("Success!! :D");
-                    menu();
+                    menuInicial(client);
                 }
                 else {
                     System.out.println("Username already exists");
-                    menuregister();
+                    menuregister(client);
                 }
         }
         scanner.close();
     }
 
-    private static void menulogIn() throws IOException{
+    private static void menulogIn(Client client) throws IOException, InterruptedException{
         Scanner scanner = new Scanner(System.in);
         System.out.println("Please enter your Username:");
         String username = scanner.nextLine();
         System.out.println("Please enter your Password:");
         String password = scanner.nextLine();
 
-        Boolean resultado = cliente.logIn(username, password);
+        Boolean resultado = client.logIn(username, password);
         if(resultado) {
             System.out.println("Success!! :D");
-            menu();// provavelmente mandar para outro sitio para continuar
+            menuInicial(client);// provavelmente mandar para outro sitio para continuar
         }
         else {
             System.out.println("Password or Username are incorrect");
-            menulogIn();
+            menulogIn(client);
         }
         scanner.close();
     }
 
-    private static void menu() throws IOException {
+    public static void menuInicial(Client client) throws IOException, InterruptedException {
         System.out.println("1 - Sign-up");
         System.out.println("2 - Log-In");
 
@@ -62,11 +61,11 @@ public class MenuInicial {
         int escolha = scanner.nextInt();
         switch(escolha) {
             case 1: {
-                menuregister();
+                menuregister(client);
                 break;
             }
             case 2: {
-                menulogIn();
+                menulogIn(client);
                 break;
             }
             default: {
@@ -76,13 +75,11 @@ public class MenuInicial {
         }
         scanner.close();        
     }
+/*
+ * 
+ private static void menuPrincipal() {
+     
+}
+*/
 
-    public static void main(String[] args) {
-        try {
-            cliente = new Client();  // Inicialize a instância de Client
-            menu();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 }
