@@ -111,7 +111,7 @@ import Connections.TaggedConnection.Frame;;
                             }
                             case "ServerClose": {
                                 String password = parts[1];
-                                if(password.equals("123")){
+                                if(serverData.serverclose(password)){
                                     String resultado = "true";
                                     serverData.putUsersInDataBase();
                                     conn.send(client_Tag, resultado.getBytes());

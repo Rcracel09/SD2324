@@ -184,4 +184,19 @@ public class ServerData {
             lWRUser.writeLock().unlock();
         }
     }
+
+    public Boolean serverclose(String password) {
+        lWRUser.writeLock().lock();
+        try {
+            if(password.equals("123")) {
+                return true;
+            }
+            else {
+                return false;
+            }
+        } finally {
+            lWRUser.writeLock().unlock();
+        }
+    }
+
 }

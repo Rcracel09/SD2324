@@ -1,144 +1,236 @@
-
-import java.net.Socket;
-
-
-import Connections.*;
-
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Client {
 
-    private Socket s;
-    private Demultiplexer m;
-    private int personalTag;
 
+    private static void menuregister(ClientData client) throws IOException, InterruptedException {
+        Scanner scanner = new Scanner(System.in);
 
-    public Client() throws IOException {
-        s = new Socket("localhost", 11200);
-        m = new Demultiplexer(new TaggedConnection(s));
-        m.start();
-        String command = "startClient";
-        m.send(personalTag, command.getBytes());
-        try {
-            byte[] tag_Bytes = m.receive(0);
-            String Tag_String = new String(tag_Bytes);
-            personalTag = Integer.parseInt(Tag_String);
-            System.out.println("Este client tem esta tag " + Tag_String);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        
-    }
-
-    //acabar esta função ela vai ter de receber do server a ver se autenticação
-    //foi um sucesso ou não
-    public Boolean register(String username, String password)throws IOException, InterruptedException{
-        String send_Content = "register"+";"+username+";"+password;
-        m.send(personalTag, send_Content.getBytes());
-
-        byte[] result_data = m.receive(personalTag); //throws declaration feita InterruptedException
-        String resultadoString = new String(result_data);
-        if(resultadoString.compareTo("true") == 0) {
-            return true;
+        System.out.println("Username:");
+        String username = scanner.nextLine();
+        System.out.println("Password:");
+        String password = scanner.nextLine();
+        System.out.println("Por favor escreva a sua password outra vez:");
+        String passwordCheck = scanner.nextLine();
+        if (!password.equals(passwordCheck)) {
+            System.out.println("As passoword não correspondem tente outra vez:");
+            menuregister(client);
         }
         else {
-            return false;
+                Boolean resultado = client.register(username, password);
+                if(resultado) {
+                    System.out.println("Successo!! :D");
+                    menuInicial(client);
+                }
+                else {
+                    System.out.println("Username already exists");
+                    menuInicial(client);
+                }
         }
+        scanner.close();
     }
 
-    public Boolean logIn(String username, String password)throws IOException, InterruptedException{
+    private static void menulogIn(ClientData client) throws IOException, InterruptedException{
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Username:");
+        String username = scanner.nextLine();
+        System.out.println("Password:");
+        String password = scanner.nextLine();
 
-        String send_Content = "logIn"+";"+username+";"+password;
-        m.send(personalTag, send_Content.getBytes());
-
-        byte[] result_data = m.receive(personalTag); //throws declaration feita InterruptedException
-        String resultadoString = new String(result_data);
-        if(resultadoString.compareTo("true") == 0) {
-            return true;
+        Boolean resultado = client.logIn(username, password);
+        if(resultado) {
+            System.out.println("Successo!! :D");
+            menuPrincipal(client);
         }
         else {
-            return false;
+            System.out.println("Este utilizador já se encontra logado ou as credenciais estão erradas");
+            menuInicial(client);
         }
+        scanner.close();
     }
 
-    public String sendJob(String current_line) throws IOException, InterruptedException {
-        //Envia uma linha para ser executada
-        String send_Content = "JobFunction"+";"+current_line;
-        m.send(personalTag, send_Content.getBytes());
-        //
-        byte[] result_data = m.receive(personalTag);
-        String resultadoString = new String(result_data);
-        String[] parts = resultadoString.split(";");
-        String file_name = parts[0];
-        String final_output = parts[1];
-        //Trata da Exeception que ocorre em JobFunction
-        if(final_output.equals("Falhou ao executar")) {
-            String resultado = file_name + " " + "Falhou ao executar";
-            return resultado;
-        }
-        //Parte do codigo que escreve o resultado no ficheiro
-        else {
-            String resultado = "Acabei de receber o " + file_name;
-            File output = new File("../Resultados/" +personalTag+"Cliente"+file_name);
-            FileWriter fw = new FileWriter(output);
-            BufferedWriter writer = new BufferedWriter(fw);
-            writer.write(final_output);
-            writer.close();
-            return resultado;
+    public static void menuInicial(ClientData client) throws IOException, InterruptedException {
+        System.out.println("1 - Sign-up");
+        System.out.println("2 - Log-In");
+
+        Scanner scanner = new Scanner(System.in);
+        int escolha = scanner.nextInt();
+        switch(escolha) {
+            case 1: {
+                menuregister(client);
+                break;
             }
+            case 2: {
+                menulogIn(client);
+                break;
+            }
+            default: {
+                System.out.println("Por favor selecione uma opção válida");
+                menuInicial(client);
+                break;
+            }
+        }
+        scanner.close();        
     }
 
-    public String consult(String consultTitle) throws IOException, InterruptedException {
-        System.out.println("Vou verificar o atual estado de ocupação do serviço");
-        String send_Content = "Consult";
-        m.send(personalTag + 1, send_Content.getBytes());
+    public static void menuJob(ClientData client) throws InterruptedException, IOException {
+        try {
+            System.out.println("Por favor diga um ficheiro que queira executar");
+            Scanner scanner = new Scanner(System.in);
+            String file_name = scanner.nextLine();
+            
+            File file = new File("../data/Tests/" + file_name+".csv");
+            Scanner file_scanner =  new Scanner(file);
+            Scanner file_scanner_checker = new Scanner(file);
+            ReentrantLock lock = new ReentrantLock();
 
-        byte[] result_data = m.receive(personalTag+1);
-        String resultadoString =  new String(result_data);
-        String[] parts = resultadoString.split(";");
-        String memory = parts[0];
-        String waiting = parts[1];
-        String resultado =" A sua consulta " + consultTitle + " diz que a memória disponivel é " + memory + " e que tem uma fila de espera de " + waiting + " Tarefas";
-        return resultado;
+            List<Thread> threads = new ArrayList<>();
+            
+            while(file_scanner_checker.hasNextLine()) { // vai mandar todas as linhas uma a uma para executar as tarefas que pede 
+                file_scanner_checker.nextLine();
+                Runnable worker = () -> {
+                    String current_line;
+                    lock.lock();
+                    try {
+                        current_line = file_scanner.nextLine();
+                    } finally {
+                        lock.unlock();
+                    }
+                    try {
+                        String resultado = client.sendJob(current_line);
+                        System.out.println(resultado);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                };
+
+                Thread thread = new Thread(worker);
+                threads.add(thread);
+                thread.start();
+            }
+            file_scanner_checker.close();
+            menuPrincipal(client);
+            scanner.close();
+            
+            for (Thread thread : threads) {
+                thread.join();
+            }
+            file_scanner.close();
+
+        } catch (FileNotFoundException e) {
+            System.out.println("Erro: Ficheiro não existe!!");
+            menuPrincipal(client);
+        }
     }
 
-    public Boolean logout (String username) throws IOException, InterruptedException {
-        String send_content = "logOut;"+username;
-        m.send(personalTag+2, send_content.getBytes());
+    private static void menuConsult(ClientData client) throws IOException, InterruptedException {
+        System.out.println("Por favor dê um nome à sua consulta");
+        Scanner scanner = new Scanner(System.in);
+        String consult_name = scanner.nextLine();
+        
+        Runnable worker = () -> {
+            String resultado;
+            try {
+                resultado = client.consult(consult_name);
+                System.out.println(resultado);
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        };
+        Thread thread = new Thread(worker);
+        thread.start();
+        
+        menuPrincipal(client);
+        scanner.close();
+    }
 
-        byte[] result_data = m.receive(personalTag+2);
-        String resultadoString = new String(result_data);
-        if(resultadoString.equals("true")) {
-            return true;
+    private static void menuLogout(ClientData client) throws IOException, InterruptedException {
+        System.out.println("Por favor indique o seu nome de utilizador para dar Logout");
+        Scanner scanner = new Scanner(System.in);
+        String username = scanner.nextLine();
+
+        Boolean  resultado = client.logout(username);
+        if (resultado) {
+            System.out.println("Foi realizado Logout com sucesso");
+            menuInicial(client);
         }
         else {
-            return false;
+            System.out.println("Nome de utilizador incorreto Logout não foi realizado");
+            menuPrincipal(client);            
         }
+        scanner.close();
     }
 
-    public Boolean closeServer(String password) throws IOException, InterruptedException {
-        String send_content = "ServerClose;"+password;
-        m.send(personalTag+3, send_content.getBytes());
+    private static void menuCloseServer(ClientData client) throws IOException, InterruptedException {
+        System.out.println("Password:");
+        Scanner scanner = new Scanner(System.in);
+        String password = scanner.nextLine();
 
-        byte[] result_data = m.receive(personalTag+3);
-        String resultadoString = new String (result_data);
-        if(resultadoString.equals("true")) {
-            return true;
+        Boolean resultado = client.closeServer(password);
+        if(resultado) {
+            System.out.println("O server vai fechar");
+            System.exit(0);
         }
         else {
-            return false;
+            System.out.println("Password Errada");
+            menuPrincipal(client);
         }
+        scanner.close();
+    }
+
+
+     private static void menuPrincipal(ClientData client) throws IOException, InterruptedException {
+        System.out.println("1 - Executar uma tarefa");
+        System.out.println("2 - Verificar o estado atual de ocupação do serviço");
+        System.out.println("3 - Logout");
+        System.out.println("4 - Fechar o Servidor");
+
+        Scanner scanner = new Scanner(System.in);
+        int escolha = scanner.nextInt();
+
+        switch(escolha) {
+            case 1: {
+                menuJob(client);
+                break;
+            }
+
+            case 2: {
+                menuConsult(client);
+                break;
+            }
+            case 3: {
+                menuLogout(client);
+                break;
+            }
+            case 4: {
+                menuCloseServer(client);
+            }
+            default: {
+                System.out.println("Por favor selecione uma opção válida");
+                menuInicial(client);
+                break;
+            }
+        }
+        scanner.close();
     }
 
     public static void main(String[] args) throws InterruptedException {
         try {
-            Client client = new Client();  // Inicialize a instância de Client
-            MenuInicial.menuInicial(client);
+            ClientData client = new ClientData();  // Inicialize a instância de Client
+            menuInicial(client);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
 }
