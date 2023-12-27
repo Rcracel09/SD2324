@@ -1,5 +1,4 @@
-package SD2324;
-
+package Connections;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;

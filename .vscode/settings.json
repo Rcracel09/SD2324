@@ -1,0 +1,6 @@
+{
+    "java.project.referencedLibraries": [
+        "lib/**/*.jar",
+        "SD2324_code/lib/sd23.jar"
+    ]
+}
