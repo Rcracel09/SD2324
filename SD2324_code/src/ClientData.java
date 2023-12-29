@@ -1,6 +1,9 @@
 
 import java.net.Socket;
-
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 
 import Connections.*;
 
@@ -20,13 +23,14 @@ public class ClientData {
         s = new Socket("localhost", 11200);
         m = new Demultiplexer(new TaggedConnection(s));
         m.start();
-        String command = "startClient";
-        m.send(personalTag, command.getBytes());
+        Command info = new Command("startClient");
+        byte[] infoArray = info.serialize();
+        m.send(0, infoArray);
         try {
-            byte[] tag_Bytes = m.receive(0);
-            String Tag_String = new String(tag_Bytes);
-            personalTag = Integer.parseInt(Tag_String);
-            System.out.println("Este client tem esta tag " + Tag_String);
+            infoArray = m.receive(personalTag);
+            Result content = Result.deserialize(infoArray);
+            int resultadoTeste = content.get_Tag();
+            System.out.println("Este client tem esta tag " + resultadoTeste);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -36,101 +40,97 @@ public class ClientData {
     //acabar esta função ela vai ter de receber do server a ver se autenticação
     //foi um sucesso ou não
     public Boolean register(String username, String password)throws IOException, InterruptedException{
-        String send_Content = "register"+";"+username+";"+password;
-        m.send(personalTag, send_Content.getBytes());
+        Command info = new Command("register", username, password);
+        byte[] infoArray = info.serialize();
+        m.send(personalTag, infoArray);
 
-        byte[] result_data = m.receive(personalTag); //throws declaration feita InterruptedException
-        String resultadoString = new String(result_data);
-        if(resultadoString.compareTo("true") == 0) {
-            return true;
-        }
-        else {
-            return false;
-        }
+        infoArray = m.receive(personalTag);
+        Result content = Result.deserialize(infoArray);
+        Boolean resultado = content.get_Resultado();
+        return resultado;
     }
 
     public Boolean logIn(String username, String password)throws IOException, InterruptedException{
+        Command info = new Command("logIn", username, password);
+        byte[] infoArray = info.serialize();
+        m.send(personalTag, infoArray);
 
-        String send_Content = "logIn"+";"+username+";"+password;
-        m.send(personalTag, send_Content.getBytes());
-
-        byte[] result_data = m.receive(personalTag); //throws declaration feita InterruptedException
-        String resultadoString = new String(result_data);
-        if(resultadoString.compareTo("true") == 0) {
-            return true;
-        }
-        else {
-            return false;
-        }
+        infoArray = m.receive(personalTag); //throws declaration feita InterruptedException
+        Result content = Result.deserialize(infoArray);
+        Boolean resultado = content.get_Resultado();
+        return resultado;
     }
 
     public String sendJob(String current_line) throws IOException, InterruptedException {
-        //Envia uma linha para ser executada
-        String send_Content = "JobFunction"+";"+current_line;
-        m.send(personalTag, send_Content.getBytes());
-        //
-        byte[] result_data = m.receive(personalTag);
-        String resultadoString = new String(result_data);
-        String[] parts = resultadoString.split(";");
+        String[] parts = current_line.split(";");
         String file_name = parts[0];
-        String final_output = parts[1];
+        
+        String memoryString = parts[1];
+        int memory = Integer.parseInt(memoryString);
+        
+        String jobString = parts[2];
+        byte [] job = Files.readAllBytes(Path.of(jobString));
+        
+        Command info = new Command("JobFunction",memory, file_name,job);
+        byte[] infoArray = info.serialize();
+        m.send(personalTag, infoArray);
+        
+        //
+        infoArray = m.receive(personalTag); 
+        Result content = Result.deserialize(infoArray);
+        Boolean Job_sucess = content.get_Resultado();
+        file_name = content.get_Message();
         //Trata da Exeception que ocorre em JobFunction
-        if(final_output.equals("Falhou ao executar")) {
-            String resultado = file_name + " " + "Falhou ao executar";
+        if(!Job_sucess) {
+            int errorCode = content.get_code();
+            String errorMsg = content.get_Message();
+            String resultado = file_name + " "+ errorMsg + " Com o código " + errorCode;
             return resultado;
         }
         //Parte do codigo que escreve o resultado no ficheiro
         else {
             String resultado = "Acabei de receber o " + file_name;
-            File output = new File("../Resultados/" +personalTag+"Cliente"+file_name);
-            FileWriter fw = new FileWriter(output);
-            BufferedWriter writer = new BufferedWriter(fw);
-            writer.write(final_output);
-            writer.close();
+            file_name = file_name + ".7z";
+            Path caminho = Paths.get("../Resultados/" + file_name);
+            Files.write(caminho, content.get_Job(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             return resultado;
             }
     }
 
     public String consult(String consultTitle) throws IOException, InterruptedException {
-        System.out.println("Vou verificar o atual estado de ocupação do serviço");
-        String send_Content = "Consult";
-        m.send(personalTag + 1, send_Content.getBytes());
+        Command info = new Command("Consult", consultTitle);
+        byte[] infoArray = info.serialize();
+        m.send(personalTag+1, infoArray);
 
-        byte[] result_data = m.receive(personalTag+1);
-        String resultadoString =  new String(result_data);
-        String[] parts = resultadoString.split(";");
-        String memory = parts[0];
-        String waiting = parts[1];
+        infoArray = m.receive(personalTag+1);
+        Result content = Result.deserialize(infoArray);
+
+        int memory = content.get_memory();
+        int waiting = content.get_Waiting();
         String resultado =" A sua consulta " + consultTitle + " diz que a memória disponivel é " + memory + " e que tem uma fila de espera de " + waiting + " Tarefas";
         return resultado;
     }
 
-    public Boolean logout (String username) throws IOException, InterruptedException {
-        String send_content = "logOut;"+username;
-        m.send(personalTag+2, send_content.getBytes());
+    public Boolean logout(String username, String password) throws IOException, InterruptedException {
+        Command info = new Command("logOut", username, password);
+        byte[] infoArray = info.serialize();
+        m.send(personalTag+2, infoArray);
 
-        byte[] result_data = m.receive(personalTag+2);
-        String resultadoString = new String(result_data);
-        if(resultadoString.equals("true")) {
-            return true;
-        }
-        else {
-            return false;
-        }
+        infoArray = m.receive(personalTag+2); 
+        Result content = Result.deserialize(infoArray);
+        Boolean resultado = content.get_Resultado();
+        return resultado;
     }
 
     public Boolean closeServer(String password) throws IOException, InterruptedException {
-        String send_content = "ServerClose;"+password;
-        m.send(personalTag+3, send_content.getBytes());
+        Command info = new Command("ServerClose", password);
+        byte[] infoArray = info.serialize();
+        m.send(personalTag+2, infoArray);
 
-        byte[] result_data = m.receive(personalTag+3);
-        String resultadoString = new String (result_data);
-        if(resultadoString.equals("true")) {
-            return true;
-        }
-        else {
-            return false;
-        }
+        infoArray = m.receive(personalTag+2);
+        Result content = Result.deserialize(infoArray);
+        Boolean resultado = content.get_Resultado();
+        return resultado;
     }
 
 }

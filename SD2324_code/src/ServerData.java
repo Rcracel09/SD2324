@@ -16,7 +16,7 @@ public class ServerData {
         lWRUser = new ReentrantReadWriteLock();
         usersMap= new HashMap<>();
         fillUserMap();
-        memory_available = 101;
+        memory_available = 1000000;
         jobs_waiting = 0;
         clientCounter = 0;
     }
@@ -95,11 +95,11 @@ public class ServerData {
         }
     }
 
-    public boolean logOutUserServer(String username, int client_Tag) {
+    public boolean logOutUserServer(String username, String password, int client_Tag) {
         lWRUser.writeLock().lock();
         try {
             User userCheck = usersMap.get(username);
-            if(userCheck.getClient_Tag() == client_Tag) {
+            if(userCheck.getClient_Tag() == client_Tag-2 && userCheck.getPassword().equals(password)) {
                 userCheck.setClient_Tag(0);
                 return true;
             }
@@ -178,7 +178,7 @@ public class ServerData {
     public int clientCounter_Increase() {
         lWRUser.writeLock().lock();
         try {
-            clientCounter += 4;
+            clientCounter += 3;
             return clientCounter;
         } finally {
             lWRUser.writeLock().unlock();

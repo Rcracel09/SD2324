@@ -158,14 +158,16 @@ public class Client {
         System.out.println("Por favor indique o seu nome de utilizador para dar Logout");
         Scanner scanner = new Scanner(System.in);
         String username = scanner.nextLine();
+        System.out.println("Password:");
+        String password = scanner.nextLine();
 
-        Boolean  resultado = client.logout(username);
+        Boolean  resultado = client.logout(username, password);
         if (resultado) {
             System.out.println("Foi realizado Logout com sucesso");
             menuInicial(client);
         }
         else {
-            System.out.println("Nome de utilizador incorreto Logout não foi realizado");
+            System.out.println("Credenciais incorretas Logout não foi realizado");
             menuPrincipal(client);            
         }
         scanner.close();
